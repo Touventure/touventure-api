@@ -1,4 +1,5 @@
-const db = require('./firebase');
+const { db, auth } = require('./firebase');
+const admin = require('firebase-admin');
 
 const getTourism = async (request, h) => {
   // Name collection
@@ -54,4 +55,56 @@ const getTourismById = async (request, h) => {
   }
 };
 
-module.exports = { getTourism, getTourismById };
+const login = async (request, h) => {
+  const { email, password } = request.payload;
+
+  try {
+    // Authenticate a user with Firebase Authentication
+    admin
+      .auth()
+      .signInWithEmailAndPassword(email, password)
+      .then((userCredential) => {
+        // User is authenticated
+        const user = userCredential.user;
+        console.log(`User ${user.email} is authenticated`);
+      })
+      .catch((error) => {
+        // Authentication failed
+        console.error('Authentication failed:', error);
+      });
+  } catch (error) {
+    return { error: error.message };
+  }
+};
+
+const register = async (request, h) => {
+  // Get email password
+  const { email, password } = request.payload;
+
+  try {
+    // Register a new user with email and password
+    const userCredential = await auth.createUser({
+      email,
+      password,
+    });
+
+    const user = userCredential.toJSON();
+    console.log(user);
+
+    // Store additional user information in Firestore
+    await db.collection('users').doc(user.uid).set({
+      email: user.email,
+      // Add more fields as needed
+    });
+
+    const response = h.response({
+      status: 'success',
+      message: 'User registered successfully',
+    });
+    return response;
+  } catch (error) {
+    return { error: error.message };
+  }
+};
+
+module.exports = { getTourism, getTourismById, register, login };
